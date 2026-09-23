@@ -31,39 +31,59 @@ It was built as a graphical front-end for a shell script that does the same job 
 
 ### Building
 
-1. Install the compiler toolchain:
+1. Install the compiler toolchain and FLTK 1.3 (runtime + development headers). Use `-wil` instead of `-wi` so these build-only tools are downloaded and loaded for the current session **without** being added to `onboot.lst` — you don't need to load a full compiler toolchain on every boot if you're not compiling every day:
 
    ```sh
-   tce-load -wi compiletc.tcz
-   ```
-
-2. Install FLTK 1.3 (runtime + development headers):
-
-   ```sh
-   tce-load -wi fltk-1.3-dev.tcz
+   tce-load -wil compiletc.tcz
+   tce-load -wil fltk-1.3-dev.tcz
    ```
 
    `tce-load` will automatically pull in `fltk-1.3.tcz` and any required X11 dependencies.
 
-3. Verify FLTK is available:
+2. Verify FLTK is available:
 
    ```sh
    fltk-config --version
    ```
 
-4. Compile:
+3. Compile (quick build):
 
    ```sh
    g++ -O2 -o tinykeyxorg tinykeyxorg.cpp $(fltk-config --cxxflags --ldflags)
    ```
 
-5. Run:
+4. Run:
 
    ```sh
    ./tinykeyxorg
    ```
 
    You don't need to prefix it with `sudo` — the app will ask for the password graphically if it needs root privileges.
+
+### Optimized, minimal-size build
+
+Since this is meant to run on Tiny Core Linux, where every kilobyte in the base filesystem matters, you can build a much smaller binary by targeting the 32-bit baseline CPU, optimizing for size instead of speed, dropping the exception/RTTI runtime support (the code doesn't use either), and linking with a trimmed-down linker script (`elf_i386.xbn`, part of `binutils`):
+
+```sh
+g++ -flto -march=i486 -mtune=i686 -Os -pipe -fno-exceptions -fno-rtti \
+    -o tinykeyxorg tinykeyxorg.cpp $(fltk-config --cxxflags --ldflags) \
+    -Wl,-T/usr/local/lib/ldscripts/elf_i386.xbn
+```
+
+If your `find /usr -iname elf_i386.xbn` reports a different path than the one above, adjust it accordingly.
+
+Then strip the binary further with `sstrip` (from the `sstrip.tcz` extension, loaded the same on-demand way since it's only needed while building):
+
+```sh
+tce-load -wil sstrip.tcz
+strip --strip-all tinykeyxorg
+sstrip tinykeyxorg
+ls -la tinykeyxorg
+```
+
+`strip --strip-all` removes symbol tables and debug information the running program doesn't need. `sstrip` goes further and removes the ELF section header table itself, which the Linux kernel doesn't need to execute the binary (only debuggers/analysis tools would). Community members have reported binaries as small as ~16.85 KB with this combination.
+
+Acknowledgements: to Juanito from the official Tiny Core Linux forum for his help and for sharing these compilation flags.
 
 ### License
 
@@ -98,39 +118,59 @@ Fue creada como interfaz gráfica de un script de shell que hace lo mismo desde 
 
 ### Compilación
 
-1. Instalá las herramientas de compilación:
+1. Instalá las herramientas de compilación y FLTK 1.3 (runtime + headers de desarrollo). Usá `-wil` en vez de `-wi` para que estas herramientas, que solo hacen falta al compilar, se descarguen y carguen en la sesión actual **sin** agregarse a `onboot.lst` — no hace falta cargar todo un toolchain de compilación en cada arranque si no vas a compilar todos los días:
 
    ```sh
-   tce-load -wi compiletc.tcz
-   ```
-
-2. Instalá FLTK 1.3 (runtime + headers de desarrollo):
-
-   ```sh
-   tce-load -wi fltk-1.3-dev.tcz
+   tce-load -wil compiletc.tcz
+   tce-load -wil fltk-1.3-dev.tcz
    ```
 
    `tce-load` va a traer automáticamente `fltk-1.3.tcz` y las dependencias de X11 necesarias.
 
-3. Verificá que FLTK esté disponible:
+2. Verificá que FLTK esté disponible:
 
    ```sh
    fltk-config --version
    ```
 
-4. Compilá:
+3. Compilá (build rápida):
 
    ```sh
    g++ -O2 -o tinykeyxorg tinykeyxorg.cpp $(fltk-config --cxxflags --ldflags)
    ```
 
-5. Ejecutá:
+4. Ejecutá:
 
    ```sh
    ./tinykeyxorg
    ```
 
    No hace falta anteponer `sudo` — la aplicación pide la contraseña gráficamente si necesita privilegios de root.
+
+### Build optimizada y de tamaño mínimo
+
+Como esto está pensado para correr en Tiny Core Linux, donde cada kilobyte del sistema base importa, se puede lograr un binario bastante más chico apuntando a la CPU base de 32 bits, optimizando por tamaño en vez de velocidad, sacando el soporte de excepciones/RTTI (el código no usa ninguno de los dos), y linkeando con un linker script recortado (`elf_i386.xbn`, parte de `binutils`):
+
+```sh
+g++ -flto -march=i486 -mtune=i686 -Os -pipe -fno-exceptions -fno-rtti \
+    -o tinykeyxorg tinykeyxorg.cpp $(fltk-config --cxxflags --ldflags) \
+    -Wl,-T/usr/local/lib/ldscripts/elf_i386.xbn
+```
+
+Si tu `find /usr -iname elf_i386.xbn` te devuelve una ruta distinta a la de arriba, ajustala.
+
+Después, achicá el binario todavía más con `sstrip` (viene de la extensión `sstrip.tcz`, cargada de la misma forma "on-demand" ya que solo hace falta al compilar):
+
+```sh
+tce-load -wil sstrip.tcz
+strip --strip-all tinykeyxorg
+sstrip tinykeyxorg
+ls -la tinykeyxorg
+```
+
+`strip --strip-all` elimina la tabla de símbolos y la información de debug que el programa no necesita para correr. `sstrip` va un paso más allá y elimina la tabla de section headers del ELF, que el kernel de Linux tampoco necesita para ejecutarlo (solo la usarían debuggers o herramientas de análisis). En la comunidad reportaron binarios de hasta ~16.85 KB con esta combinación.
+
+Agradecimientos: a Juanito del foro oficial de Tiny Core Linux por su ayuda y por compartir estas flags de compilación.
 
 ### Licencia
 
